@@ -1,16 +1,40 @@
-import { useState } from "react";
-import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Easing,
+  LayoutChangeEvent,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Matchup } from "../api/odds";
 import { NeedleGauge } from "../components/Speedometer";
 
 type Props = {
   matchup: Matchup;
+  isLive?: boolean;
+  currentScores?: Record<string, number>;
+  projScores?: Record<string, number>;
 };
 
 const formatPercent = (value: number) => `${(value * 100).toFixed(1)}%`;
 
-export default function MatchupCard({ matchup }: Props) {
+export default function MatchupCard({
+  matchup,
+  isLive = false,
+  currentScores,
+  projScores,
+}: Props) {
   const [cardWidth, setCardWidth] = useState(0);
+  const livePulse = useRef(new Animated.Value(0)).current;
+  const initialScoresRef = useRef<{
+    home: number;
+    away: number;
+  }>();
+  const initialWinProbRef = useRef<{
+    home: number;
+    away: number;
+  }>();
 
   const handleLayout = (event: LayoutChangeEvent) => {
     const width = Math.round(event.nativeEvent.layout.width);
@@ -18,6 +42,82 @@ export default function MatchupCard({ matchup }: Props) {
       setCardWidth(width);
     }
   };
+
+  const isResolved =
+    matchup.home_win_prob >= 0.999 || matchup.away_win_prob >= 0.999;
+  const showLiveIndicator = isLive && !isResolved;
+
+  if (!initialScoresRef.current) {
+    initialScoresRef.current = {
+      home: projScores?.[matchup.home_team] ?? matchup.home_avg,
+      away: projScores?.[matchup.away_team] ?? matchup.away_avg,
+    };
+  }
+
+  if (!initialWinProbRef.current) {
+    initialWinProbRef.current = {
+      home: matchup.home_win_prob,
+      away: matchup.away_win_prob,
+    };
+  }
+
+  const awayCurrentScore =
+    isLive && currentScores?.[matchup.away_team] != null
+      ? currentScores[matchup.away_team]
+      : initialScoresRef.current.away;
+  const homeCurrentScore =
+    isLive && currentScores?.[matchup.home_team] != null
+      ? currentScores[matchup.home_team]
+      : initialScoresRef.current.home;
+
+  const awayScoreDelta =
+    isLive ? awayCurrentScore - initialScoresRef.current.away : null;
+  const homeScoreDelta =
+    isLive ? homeCurrentScore - initialScoresRef.current.home : null;
+
+  const awayWinProbDelta = isLive
+    ? matchup.away_win_prob - initialWinProbRef.current.away
+    : null;
+  const homeWinProbDelta = isLive
+    ? matchup.home_win_prob - initialWinProbRef.current.home
+    : null;
+
+  const formatDelta = (value: number | null | undefined, digits = 1) => {
+    if (value == null) return "";
+    const display = value >= 0 ? `+${value.toFixed(digits)}` : value.toFixed(digits);
+    return ` (${display})`;
+  };
+
+  useEffect(() => {
+    if (!showLiveIndicator) {
+      livePulse.setValue(0);
+      return;
+    }
+
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(livePulse, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(livePulse, {
+          toValue: 0.2,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.delay(1200),
+      ]),
+    );
+
+    loop.start();
+
+    return () => {
+      loop.stop();
+    };
+  }, [livePulse, showLiveIndicator]);
 
   // Fill most of the padded area; cap to avoid overflow on larger screens.
   const contentWidth = cardWidth - 24; // padding: 12 left + 12 right
@@ -27,9 +127,26 @@ export default function MatchupCard({ matchup }: Props) {
   return (
     <View style={styles.card} onLayout={handleLayout}>
       <View style={styles.titleRow}>
-        <Text style={styles.teamName}>{matchup.away_team}</Text>
-        <Text style={styles.teamName}>{matchup.home_team}</Text>
-      </View>      
+        <View style={styles.teamWithLive}>
+          {showLiveIndicator && (
+            <Animated.View style={[styles.liveDot, { opacity: livePulse }]} />
+          )}
+          <View>
+            <Text style={styles.teamName}>{matchup.away_team}</Text>
+            {isLive && currentScores?.[matchup.away_team] != null && (
+              <Text style={styles.scoreText}>{currentScores[matchup.away_team]}</Text>
+            )}
+          </View>
+        </View>
+        <View style={styles.teamWithScore}>
+          <Text style={styles.teamName}>{matchup.home_team}</Text>
+          {isLive && currentScores?.[matchup.home_team] != null && (
+            <Text style={[styles.scoreText, styles.scoreRight]}>
+              {currentScores[matchup.home_team]}
+            </Text>
+          )}
+        </View>
+      </View>
       <NeedleGauge
         size={gaugeSize}
         value={matchup.home_win_prob}
@@ -40,13 +157,44 @@ export default function MatchupCard({ matchup }: Props) {
       />
       <View style={styles.avgRow}>
         <View style={styles.avgBlockLeft}>
-          <Text style={styles.label}>Avg Score</Text>
-          <Text style={styles.avgValue}>{matchup.away_avg.toFixed(1)}</Text>
+          <Text style={styles.label}>Projected Score</Text>
+          <Text style={styles.avgValue}>
+            {awayCurrentScore.toFixed(1)}
+            <Text style={styles.deltaText}>{formatDelta(awayScoreDelta)}</Text>
+          </Text>
         </View>
         <View style={styles.avgBlockRight}>
-          <Text style={[styles.label, styles.labelRight]}>Avg Score</Text>
+          <Text style={[styles.label, styles.labelRight]}>Projected Score</Text>
           <Text style={[styles.avgValue, styles.avgValueRight]}>
-            {matchup.home_avg.toFixed(1)}
+            {homeCurrentScore.toFixed(1)}
+            <Text style={styles.deltaText}>{formatDelta(homeScoreDelta)}</Text>
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.avgRow}>
+        <View style={styles.avgBlockLeft}>
+          <Text style={styles.label}>Win %</Text>
+          <Text style={styles.avgValue}>
+            {formatPercent(matchup.away_win_prob)}
+            <Text style={styles.deltaText}>
+              {formatDelta(
+                awayWinProbDelta != null ? awayWinProbDelta * 100 : null,
+                1,
+              )}
+            </Text>
+          </Text>
+        </View>
+        <View style={styles.avgBlockRight}>
+          <Text style={[styles.label, styles.labelRight]}>Win %</Text>
+          <Text style={[styles.avgValue, styles.avgValueRight]}>
+            {formatPercent(matchup.home_win_prob)}
+            <Text style={styles.deltaText}>
+              {formatDelta(
+                homeWinProbDelta != null ? homeWinProbDelta * 100 : null,
+                1,
+              )}
+            </Text>
           </Text>
         </View>
       </View>
@@ -93,10 +241,33 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 12,
   },
+  teamWithLive: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  teamWithScore: {
+    alignItems: "flex-end",
+  },
+  liveDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#ef4444",
+    marginRight: 6,
+  },
   teamName: {
     color: "#e5e7eb",
     fontSize: 18,
     fontWeight: "700",
+  },
+  scoreText: {
+    color: "#f97316",
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  scoreRight: {
+    textAlign: "right",
   },
   value: {
     color: "#f3f4f6",
@@ -126,5 +297,10 @@ const styles = StyleSheet.create({
   },
   avgValueRight: {
     textAlign: "right",
+  },
+  deltaText: {
+    color: "#fbbf24",
+    fontSize: 13,
+    fontWeight: "700",
   },
 });

@@ -74,7 +74,12 @@ export default function OddsScreen({ onSelectMatchup }: Props) {
                 activeOpacity={0.8}
                 onPress={() => onSelectMatchup?.(item, data.date)}
               >
-                <MatchupCard matchup={item} />
+                <MatchupCard
+                  matchup={item}
+                  isLive={data.is_live}
+                  currentScores={data.current_scores}
+                  projScores={data.proj_scores}
+                />
               </TouchableOpacity>
             )}
             contentContainerStyle={styles.listContent}

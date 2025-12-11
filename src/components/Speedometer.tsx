@@ -41,6 +41,19 @@ export const NeedleGauge: React.FC<NeedleGaugeProps> = ({
   const clamped = Math.max(0, Math.min(1, value));
   const targetAngle = minAngle + (maxAngle - minAngle) * clamped;
 
+  const favoredTeam = clamped >= 0.5 ? rightLabel : leftLabel;
+  const favoredProb = clamped >= 0.5 ? clamped : 1 - clamped;
+  const favoredPercent = favoredProb * 100;
+
+  const confidenceLabel =
+    favoredPercent >= 91
+      ? "Very Likely"
+      : favoredPercent >= 75
+        ? "Likely"
+        : favoredPercent >= 60
+          ? "Leaning"
+          : "Tossup";
+
   useEffect(() => {
     angle.value = withTiming(targetAngle, { duration });
     fill.value = withTiming(clamped, { duration });
@@ -61,12 +74,15 @@ export const NeedleGauge: React.FC<NeedleGaugeProps> = ({
   }));
 
   const percent = (clamped * 100).toFixed(1);
-  const winningTeam = clamped >= 0.5 ? rightLabel : leftLabel;
+  const winningTeam = favoredTeam;
   const displayedPercent =
     clamped >= 0.5 ? percent : (100 - parseFloat(percent)).toFixed(1);
 
   return (
     <View style={styles.container}>
+      <Text style={styles.statusText}>
+        {confidenceLabel} {favoredTeam}
+      </Text>
       <View
         style={[
           styles.labelsRow,
@@ -138,9 +154,6 @@ export const NeedleGauge: React.FC<NeedleGaugeProps> = ({
       </View>
 
       <View style={styles.percentRow}>
-        <Text style={styles.percentText}>
-          {displayedPercent}% {winningTeam}
-        </Text>
       </View>
     </View>
   );
@@ -156,6 +169,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 2,
+  },
+  statusText: {
+    color: "#e5e7eb",
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 4,
+    textAlign: "center",
   },
   teamLabel: {
     color: "#e5e7eb",

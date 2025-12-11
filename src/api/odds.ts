@@ -13,9 +13,12 @@ export interface Matchup {
 
 export interface OddsResponse {
   date: string;
+  is_live: boolean;
   matchups: Matchup[];
+  proj_scores: Record<string, number>;
+  current_scores: Record<string, number>;
 }
-
+//https://fantasyprediction.onrender.com
 export const API_BASE_URL = "https://fantasyprediction.onrender.com";
 
 export async function getTodayOdds(): Promise<OddsResponse> {
