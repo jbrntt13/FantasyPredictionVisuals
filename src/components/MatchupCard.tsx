@@ -30,11 +30,11 @@ export default function MatchupCard({
   const initialScoresRef = useRef<{
     home: number;
     away: number;
-  }>();
+  } | undefined>(undefined);
   const initialWinProbRef = useRef<{
     home: number;
     away: number;
-  }>();
+  } | undefined>(undefined);
 
   const handleLayout = (event: LayoutChangeEvent) => {
     const width = Math.round(event.nativeEvent.layout.width);
@@ -47,17 +47,28 @@ export default function MatchupCard({
     matchup.home_win_prob >= 0.999 || matchup.away_win_prob >= 0.999;
   const showLiveIndicator = isLive && !isResolved;
 
+  const baseHomeScore =
+    projScores?.[matchup.home_team] ?? matchup.home_avg ?? 0;
+  const baseAwayScore =
+    projScores?.[matchup.away_team] ?? matchup.away_avg ?? 0;
+
+  // default to 50/50 if missing
+  const baseHomeProb =
+    typeof matchup.home_win_prob === "number" ? matchup.home_win_prob : 0.5;
+  const baseAwayProb =
+    typeof matchup.away_win_prob === "number" ? matchup.away_win_prob : 0.5;
+
   if (!initialScoresRef.current) {
     initialScoresRef.current = {
-      home: projScores?.[matchup.home_team] ?? matchup.home_avg,
-      away: projScores?.[matchup.away_team] ?? matchup.away_avg,
+      home: baseHomeScore,
+      away: baseAwayScore,
     };
   }
 
   if (!initialWinProbRef.current) {
     initialWinProbRef.current = {
-      home: matchup.home_win_prob,
-      away: matchup.away_win_prob,
+      home: baseHomeProb,
+      away: baseAwayProb,
     };
   }
 
