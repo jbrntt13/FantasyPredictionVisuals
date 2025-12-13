@@ -9,8 +9,6 @@ export interface Matchup {
   trials: number;
   home_team_url: string;
   away_team_url: string;
-  home_current_score?: number;
-  away_current_score?: number;
 }
 
 export interface OddsResponse {
@@ -19,9 +17,9 @@ export interface OddsResponse {
   matchups: Matchup[];
   proj_scores: Record<string, number>;
   current_scores: Record<string, number>;
-  win_probs: Record<string, number>;
 }
 //https://fantasyprediction.onrender.com
+//http://192.168.179.204:8000
 export const API_BASE_URL = "https://fantasyprediction.onrender.com";
 
 export async function getTodayOdds(): Promise<OddsResponse> {

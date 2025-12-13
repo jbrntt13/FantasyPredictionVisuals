@@ -86,6 +86,9 @@ export default function MatchupCard({
   const homeScoreDelta =
     isLive ? homeCurrentScore - initialScoresRef.current.home : null;
 
+  const awayScoreDisplayDelta = matchup.away_avg - initialScoresRef.current.away;
+  const homeScoreDisplayDelta = matchup.home_avg - initialScoresRef.current.home;
+
   const awayWinProbDelta = isLive
     ? matchup.away_win_prob - initialWinProbRef.current.away
     : null;
@@ -98,6 +101,8 @@ export default function MatchupCard({
     const display = value >= 0 ? `+${value.toFixed(digits)}` : value.toFixed(digits);
     return ` (${display})`;
   };
+  const formatScoreDelta = (value: number) =>
+    value >= 0 ? `+${value.toFixed(1)}` : value.toFixed(1);
 
   useEffect(() => {
     if (!showLiveIndicator) {
@@ -170,15 +175,29 @@ export default function MatchupCard({
         <View style={styles.avgBlockLeft}>
           <Text style={styles.label}>Projected Score</Text>
           <Text style={styles.avgValue}>
-            {awayCurrentScore.toFixed(1)}
-            <Text style={styles.deltaText}>{formatDelta(awayScoreDelta)}</Text>
+            {matchup.away_avg.toFixed(1)}
+            <Text
+              style={[
+                styles.deltaText,
+                awayScoreDisplayDelta >= 0 ? styles.deltaPositive : styles.deltaNegative,
+              ]}
+            >
+              ({formatScoreDelta(awayScoreDisplayDelta)})
+            </Text>
           </Text>
         </View>
         <View style={styles.avgBlockRight}>
           <Text style={[styles.label, styles.labelRight]}>Projected Score</Text>
           <Text style={[styles.avgValue, styles.avgValueRight]}>
-            {homeCurrentScore.toFixed(1)}
-            <Text style={styles.deltaText}>{formatDelta(homeScoreDelta)}</Text>
+            {matchup.home_avg.toFixed(1)}
+            <Text
+              style={[
+                styles.deltaText,
+                homeScoreDisplayDelta >= 0 ? styles.deltaPositive : styles.deltaNegative,
+              ]}
+            >
+              ({formatScoreDelta(homeScoreDisplayDelta)})
+            </Text>
           </Text>
         </View>
       </View>
@@ -188,7 +207,14 @@ export default function MatchupCard({
           <Text style={styles.label}>Win %</Text>
           <Text style={styles.avgValue}>
             {formatPercent(matchup.away_win_prob)}
-            <Text style={styles.deltaText}>
+            <Text
+              style={[
+                styles.deltaText,
+                awayWinProbDelta != null && awayWinProbDelta >= 0
+                  ? styles.deltaPositive
+                  : styles.deltaNegative,
+              ]}
+            >
               {formatDelta(
                 awayWinProbDelta != null ? awayWinProbDelta * 100 : null,
                 1,
@@ -200,7 +226,14 @@ export default function MatchupCard({
           <Text style={[styles.label, styles.labelRight]}>Win %</Text>
           <Text style={[styles.avgValue, styles.avgValueRight]}>
             {formatPercent(matchup.home_win_prob)}
-            <Text style={styles.deltaText}>
+            <Text
+              style={[
+                styles.deltaText,
+                homeWinProbDelta != null && homeWinProbDelta >= 0
+                  ? styles.deltaPositive
+                  : styles.deltaNegative,
+              ]}
+            >
               {formatDelta(
                 homeWinProbDelta != null ? homeWinProbDelta * 100 : null,
                 1,
@@ -310,8 +343,13 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   deltaText: {
-    color: "#fbbf24",
     fontSize: 13,
     fontWeight: "700",
+  },
+  deltaPositive: {
+    color: "#10b981",
+  },
+  deltaNegative: {
+    color: "#ef4444",
   },
 });

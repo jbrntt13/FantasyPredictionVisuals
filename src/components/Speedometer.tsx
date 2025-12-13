@@ -1,13 +1,6 @@
 import React, { useEffect } from "react";
-import { View, Text, StyleSheet, Image } from "react-native";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-} from "react-native-reanimated";
-
-// NEW: Animated Image wrapper (so Reanimated can animate it)
-const AnimatedImage = Animated.createAnimatedComponent(Image);
+import { View, Text, StyleSheet, ImageBackground } from "react-native";
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from "react-native-reanimated";
 
 type NeedleGaugeProps = {
   value: number;        // 0–1, probability of RIGHT team
@@ -17,8 +10,8 @@ type NeedleGaugeProps = {
   maxAngle?: number;
   duration?: number;
   size?: number;
-  leftImageUrl?: string;   // <- Team A logo/profile URL
-  rightImageUrl?: string;  // <- Team B logo/profile URL
+  leftImageUrl?: string;   // unused: legacy prop kept for compatibility
+  rightImageUrl?: string;  // unused: legacy prop kept for compatibility
 };
 
 export const NeedleGauge: React.FC<NeedleGaugeProps> = ({
@@ -36,7 +29,6 @@ export const NeedleGauge: React.FC<NeedleGaugeProps> = ({
   const needleLength = dialSize / 2 - 5;
 
   const angle = useSharedValue(minAngle);
-  const fill = useSharedValue(value); // 0–1, used for background blend
 
   const clamped = Math.max(0, Math.min(1, value));
   const targetAngle = minAngle + (maxAngle - minAngle) * clamped;
@@ -56,21 +48,11 @@ export const NeedleGauge: React.FC<NeedleGaugeProps> = ({
 
   useEffect(() => {
     angle.value = withTiming(targetAngle, { duration });
-    fill.value = withTiming(clamped, { duration });
   }, [targetAngle, clamped, duration]);
 
   // needle rotation
   const needleContainerStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${angle.value}deg` }],
-  }));
-
-  // CHANGED: backgrounds now animate opacity instead of width
-  const leftBgStyle = useAnimatedStyle(() => ({
-    opacity: 1 - fill.value, // 1 when value = 0
-  }));
-
-  const rightBgStyle = useAnimatedStyle(() => ({
-    opacity: fill.value, // 1 when value = 1
   }));
 
   const percent = (clamped * 100).toFixed(1);
@@ -94,44 +76,23 @@ export const NeedleGauge: React.FC<NeedleGaugeProps> = ({
 
       <View style={[styles.dialWrapper, { width: dialSize, height: dialSize / 2 }]}>
         <View style={[styles.semiClip, { width: dialSize, height: dialSize / 2 }]}>
-          <View
+          <ImageBackground
+            source={require("../../assets/NEEDLEBACKGROUND.png")}
             style={[
               styles.dialBackground,
               { width: dialSize, height: dialSize, borderRadius: dialSize / 2 },
             ]}
+            imageStyle={{
+              borderRadius: dialSize / 2,
+              alignSelf: "center",
+              width: dialSize*1.2,
+              transform: [{ translateY: -dialSize * 0.30 },{ translateX: -dialSize * 0.099 }], // shrink background image
+              
+              
+            }}
+            resizeMode="contain"
           >
-            {/* NEW: full-size centered logos that cross-fade */}
-            {leftImageUrl && (
-              <AnimatedImage
-                source={{ uri: leftImageUrl }}
-                style={[
-                  StyleSheet.absoluteFillObject,
-                  { width: dialSize, height: dialSize },
-                  leftBgStyle,
-                ]}
-                resizeMode="contain"  // keeps logo centered & fully visible
-              />
-            )}
-
-            {rightImageUrl && (
-              <AnimatedImage
-                source={{ uri: rightImageUrl }}
-                style={[
-                  StyleSheet.absoluteFillObject,
-                  { width: dialSize, height: dialSize },
-                  rightBgStyle,
-                ]}
-                resizeMode="contain"
-              />
-            )}
-
-            {/* optional: dark overlay so logos don't overpower needle */}
-            <View
-              style={[
-                StyleSheet.absoluteFillObject,
-                { backgroundColor: "rgba(2,6,23,0.70)" },
-              ]}
-            />
+           
 
             {/* Rotating container, centered in the circle */}
             <Animated.View
@@ -149,7 +110,7 @@ export const NeedleGauge: React.FC<NeedleGaugeProps> = ({
                 ]}
               />
             </Animated.View>
-          </View>
+          </ImageBackground>
         </View>
       </View>
 
