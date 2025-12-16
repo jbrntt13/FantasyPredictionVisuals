@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MatchupCard from "../components/MatchupCard";
 import { Matchup, OddsResponse, getTodayOdds } from "../api/odds";
@@ -7,10 +7,26 @@ type Props = {
   onSelectMatchup?: (matchup: Matchup, date: string) => void;
 };
 
+const getCurrentWeekLabel = () => {
+  const today = new Date();
+  const day = today.getDay(); // 0 = Sun, 1 = Mon, ...
+  const diffToMonday = (day + 6) % 7; // how many days since Monday
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - diffToMonday);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  const fmt = (date: Date) =>
+    date.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit" });
+
+  return `Weekly Matchup of ${fmt(monday)}-${fmt(sunday)}`;
+};
+
 export default function OddsScreen({ onSelectMatchup }: Props) {
   const [data, setData] = useState<OddsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const weekLabel = useMemo(() => getCurrentWeekLabel(), []);
 
   useEffect(() => {
     let isMounted = true;
@@ -38,7 +54,7 @@ export default function OddsScreen({ onSelectMatchup }: Props) {
     fetchOdds();
     intervalId = setInterval(() => {
       fetchOdds(false); // background refresh without UI flicker
-    }, 5 * 60 * 1000);
+    }, 15 * 1000);
 
     return () => {
       isMounted = false;
@@ -50,7 +66,7 @@ export default function OddsScreen({ onSelectMatchup }: Props) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>Today&apos;s Odds</Text>
+      <Text style={styles.heading}>{weekLabel}</Text>
 
       {loading && <Text style={styles.status}>Loading…</Text>}
 
@@ -79,6 +95,7 @@ export default function OddsScreen({ onSelectMatchup }: Props) {
                   isLive={data.is_live}
                   currentScores={data.current_scores}
                   projScores={data.proj_scores}
+                  winProbs={data.win_probs}
                 />
               </TouchableOpacity>
             )}
@@ -105,6 +122,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "800",
     marginBottom: 8,
+    textAlign: "center",
   },
   status: {
     color: "#cbd5e1",

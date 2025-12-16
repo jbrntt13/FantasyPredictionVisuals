@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   View,
+  TouchableOpacity,
 } from "react-native";
 import { Matchup } from "../api/odds";
 import { NeedleGauge } from "../components/Speedometer";
@@ -15,6 +16,7 @@ type Props = {
   isLive?: boolean;
   currentScores?: Record<string, number>;
   projScores?: Record<string, number>;
+  winProbs?: Record<string, number>;
 };
 
 const formatPercent = (value: number) => `${(value * 100).toFixed(1)}%`;
@@ -24,8 +26,10 @@ export default function MatchupCard({
   isLive = false,
   currentScores,
   projScores,
+  winProbs,
 }: Props) {
   const [cardWidth, setCardWidth] = useState(0);
+  const [expanded, setExpanded] = useState(false);
   const livePulse = useRef(new Animated.Value(0)).current;
   const initialScoresRef = useRef<{
     home: number;
@@ -52,11 +56,19 @@ export default function MatchupCard({
   const baseAwayScore =
     projScores?.[matchup.away_team] ?? matchup.away_avg ?? 0;
 
-  // default to 50/50 if missing
+  // default to provided win_probs or 50/50 if missing
   const baseHomeProb =
-    typeof matchup.home_win_prob === "number" ? matchup.home_win_prob : 0.5;
+    typeof winProbs?.[matchup.home_team] === "number"
+      ? winProbs[matchup.home_team]
+      : typeof matchup.home_win_prob === "number"
+        ? matchup.home_win_prob
+        : 0.5;
   const baseAwayProb =
-    typeof matchup.away_win_prob === "number" ? matchup.away_win_prob : 0.5;
+    typeof winProbs?.[matchup.away_team] === "number"
+      ? winProbs[matchup.away_team]
+      : typeof matchup.away_win_prob === "number"
+        ? matchup.away_win_prob
+        : 0.5;
 
   if (!initialScoresRef.current) {
     initialScoresRef.current = {
@@ -89,12 +101,10 @@ export default function MatchupCard({
   const awayScoreDisplayDelta = matchup.away_avg - initialScoresRef.current.away;
   const homeScoreDisplayDelta = matchup.home_avg - initialScoresRef.current.home;
 
-  const awayWinProbDelta = isLive
-    ? matchup.away_win_prob - initialWinProbRef.current.away
-    : null;
-  const homeWinProbDelta = isLive
-    ? matchup.home_win_prob - initialWinProbRef.current.home
-    : null;
+  const awayWinProbDisplayDelta =
+    matchup.away_win_prob - initialWinProbRef.current.away;
+  const homeWinProbDisplayDelta =
+    matchup.home_win_prob - initialWinProbRef.current.home;
 
   const formatDelta = (value: number | null | undefined, digits = 1) => {
     if (value == null) return "";
@@ -103,6 +113,16 @@ export default function MatchupCard({
   };
   const formatScoreDelta = (value: number) =>
     value >= 0 ? `+${value.toFixed(1)}` : value.toFixed(1);
+
+  const awayApiScore = currentScores?.[matchup.away_team] ?? matchup.away_current_score;
+  const homeApiScore = currentScores?.[matchup.home_team] ?? matchup.home_current_score;
+  const awayApiProj = projScores?.[matchup.away_team] ?? matchup.away_avg;
+  const homeApiProj = projScores?.[matchup.home_team] ?? matchup.home_avg;
+  const awayApiWinProb = winProbs?.[matchup.away_team] ?? matchup.away_win_prob;
+  const homeApiWinProb = winProbs?.[matchup.home_team] ?? matchup.home_win_prob;
+  const dailyScoreDisplay = Array.isArray(matchup.daily_scores)
+    ? matchup.daily_scores.map((n) => n.toFixed(1)).join(", ")
+    : null;
 
   useEffect(() => {
     if (!showLiveIndicator) {
@@ -149,19 +169,21 @@ export default function MatchupCard({
           )}
           <View>
             <Text style={styles.teamName}>{matchup.away_team}</Text>
-            {isLive && currentScores?.[matchup.away_team] != null && (
-              <Text style={styles.scoreText}>{currentScores[matchup.away_team]}</Text>
-            )}
-          </View>
-        </View>
-        <View style={styles.teamWithScore}>
-          <Text style={styles.teamName}>{matchup.home_team}</Text>
-          {isLive && currentScores?.[matchup.home_team] != null && (
-            <Text style={[styles.scoreText, styles.scoreRight]}>
-              {currentScores[matchup.home_team]}
+          {currentScores?.[matchup.away_team] != null && (
+            <Text style={styles.scoreText}>
+              Current Total Points: {currentScores[matchup.away_team]}
             </Text>
           )}
         </View>
+      </View>
+      <View style={styles.teamWithScore}>
+        <Text style={styles.teamName}>{matchup.home_team}</Text>
+        {currentScores?.[matchup.home_team] != null && (
+          <Text style={[styles.scoreText, styles.scoreRight]}>
+            Current Total Points: {currentScores[matchup.home_team]}
+          </Text>
+        )}
+      </View>
       </View>
       <NeedleGauge
         size={gaugeSize}
@@ -210,13 +232,13 @@ export default function MatchupCard({
             <Text
               style={[
                 styles.deltaText,
-                awayWinProbDelta != null && awayWinProbDelta >= 0
+                awayWinProbDisplayDelta >= 0
                   ? styles.deltaPositive
                   : styles.deltaNegative,
               ]}
             >
               {formatDelta(
-                awayWinProbDelta != null ? awayWinProbDelta * 100 : null,
+                awayWinProbDisplayDelta * 100,
                 1,
               )}
             </Text>
@@ -229,13 +251,13 @@ export default function MatchupCard({
             <Text
               style={[
                 styles.deltaText,
-                homeWinProbDelta != null && homeWinProbDelta >= 0
+                homeWinProbDisplayDelta >= 0
                   ? styles.deltaPositive
                   : styles.deltaNegative,
               ]}
             >
               {formatDelta(
-                homeWinProbDelta != null ? homeWinProbDelta * 100 : null,
+                homeWinProbDisplayDelta * 100,
                 1,
               )}
             </Text>
@@ -252,6 +274,72 @@ export default function MatchupCard({
       <Text style={styles.subtext}>
         Simulated {matchup.trials.toLocaleString()} trials
       </Text>
+
+      <TouchableOpacity
+        style={styles.expandButton}
+        onPress={() => setExpanded((prev) => !prev)}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.expandButtonText}>
+          {expanded ? "Hide details" : "Show details"}
+        </Text>
+      </TouchableOpacity>
+
+      {expanded && (
+        <View style={styles.expandBox}>
+          <Text style={styles.expandTitle}>API Data</Text>
+          <View style={styles.expandRow}>
+            <Text style={styles.expandLabel}>Home projected</Text>
+            <Text style={styles.expandValue}>{homeApiProj.toFixed(1)}</Text>
+          </View>
+          <View style={styles.expandRow}>
+            <Text style={styles.expandLabel}>Away projected</Text>
+            <Text style={styles.expandValue}>{awayApiProj.toFixed(1)}</Text>
+          </View>
+          <View style={styles.expandRow}>
+            <Text style={styles.expandLabel}>Home win prob</Text>
+            <Text style={styles.expandValue}>{formatPercent(homeApiWinProb)}</Text>
+          </View>
+          <View style={styles.expandRow}>
+            <Text style={styles.expandLabel}>Away win prob</Text>
+            <Text style={styles.expandValue}>{formatPercent(awayApiWinProb)}</Text>
+          </View>
+          <View style={styles.expandRow}>
+            <Text style={styles.expandLabel}>Tie prob</Text>
+            <Text style={styles.expandValue}>{formatPercent(matchup.tie_prob)}</Text>
+          </View>
+          <View style={styles.expandRow}>
+            <Text style={styles.expandLabel}>Trials</Text>
+            <Text style={styles.expandValue}>{matchup.trials.toLocaleString()}</Text>
+          </View>
+          <View style={styles.expandRow}>
+            <Text style={styles.expandLabel}>Home current score</Text>
+            <Text style={styles.expandValue}>
+              {homeApiScore != null ? homeApiScore : "—"}
+            </Text>
+          </View>
+          <View style={styles.expandRow}>
+            <Text style={styles.expandLabel}>Away current score</Text>
+            <Text style={styles.expandValue}>
+              {awayApiScore != null ? awayApiScore : "—"}
+            </Text>
+          </View>
+          {dailyScoreDisplay ? (
+            <View style={styles.expandRow}>
+              <Text style={styles.expandLabel}>Daily scores</Text>
+              <Text style={styles.expandValueSmall}>{dailyScoreDisplay}</Text>
+            </View>
+          ) : null}
+          <View style={styles.expandRow}>
+            <Text style={styles.expandLabel}>Home logo URL</Text>
+            <Text style={styles.expandValueSmall}>{matchup.home_team_url}</Text>
+          </View>
+          <View style={styles.expandRow}>
+            <Text style={styles.expandLabel}>Away logo URL</Text>
+            <Text style={styles.expandValueSmall}>{matchup.away_team_url}</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -351,5 +439,57 @@ const styles = StyleSheet.create({
   },
   deltaNegative: {
     color: "#ef4444",
+  },
+  expandButton: {
+    marginTop: 8,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#1f2937",
+    backgroundColor: "#0f172a",
+    alignItems: "center",
+  },
+  expandButtonText: {
+    color: "#bfdbfe",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  expandBox: {
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#1f2937",
+    backgroundColor: "#0b1224",
+    gap: 6,
+  },
+  expandTitle: {
+    color: "#f8fafc",
+    fontWeight: "800",
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  expandRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  expandLabel: {
+    color: "#9ca3af",
+    fontSize: 13,
+  },
+  expandValue: {
+    color: "#e5e7eb",
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "right",
+    maxWidth: "55%",
+  },
+  expandValueSmall: {
+    color: "#cbd5e1",
+    fontSize: 11,
+    textAlign: "right",
+    flex: 1,
+    marginLeft: 10,
   },
 });

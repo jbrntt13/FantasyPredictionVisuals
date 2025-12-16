@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   needle: {
     position: "absolute",
     alignSelf: "center",
-    width: 2,
+    width: 3,
     backgroundColor: "#f97316",
     borderRadius: 9999,
   },
