@@ -36,8 +36,8 @@ export interface OddsResponse {
   game_fraction?: number;
 }
 // Switch between prod and local:
-//export const API_BASE_URL = "https://fantasyprediction.onrender.com";
-export const API_BASE_URL = "http://192.168.179.204:8000";
+export const API_BASE_URL = "https://fantasyprediction.onrender.com";
+//export const API_BASE_URL = "http://192.168.179.204:8000";
 export async function getTodayOdds(): Promise<OddsResponse> {
   const response = await fetch(`${API_BASE_URL}/odds/weekly`);
 
