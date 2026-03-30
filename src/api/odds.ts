@@ -36,8 +36,8 @@ export interface OddsResponse {
   game_fraction?: number;
 }
 // Switch between prod and local:
-export const API_BASE_URL = "https://fantasyprediction.onrender.com";
-//export const API_BASE_URL = "http://192.168.179.204:8000";
+//export const API_BASE_URL = "https://fantasyprediction.onrender.com";
+export const API_BASE_URL = "http://192.168.179.204:8000";
 export async function getTodayOdds(): Promise<OddsResponse> {
   const response = await fetch(`${API_BASE_URL}/odds/weekly`);
 
@@ -64,6 +64,18 @@ export async function demoSetFraction(fraction: number): Promise<void> {
 
 export async function demoSetSpeed(speed: number): Promise<void> {
   await fetch(`${API_BASE_URL}/demo/set-speed?speed=${speed}`, { method: "POST" });
+}
+
+export async function getTodayDayOdds(): Promise<OddsResponse> {
+  const response = await fetch(`${API_BASE_URL}/odds/today`);
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => response.statusText);
+    throw new Error(message || `Request failed with status ${response.status}`);
+  }
+
+  const data = (await response.json()) as OddsResponse;
+  return data;
 }
 
 export async function getCustomOdds(

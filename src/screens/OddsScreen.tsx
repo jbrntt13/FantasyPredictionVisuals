@@ -11,6 +11,7 @@ import {
   Matchup,
   OddsResponse,
   getTodayOdds,
+  getTodayDayOdds,
   demoReset,
   demoSetFraction,
   demoSetSpeed,
@@ -203,13 +204,14 @@ export default function OddsScreen({ onSelectMatchup }: Props) {
   const [data, setData] = useState<OddsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"week" | "day">("week");
   const weekLabel = useMemo(() => getCurrentWeekLabel(), []);
   const isMountedRef = useRef(true);
 
   const fetchOdds = useCallback(async (showLoader = true) => {
     try {
       if (showLoader) setLoading(true);
-      const response = await getTodayOdds();
+      const response = viewMode === "day" ? await getTodayDayOdds() : await getTodayOdds();
       if (!isMountedRef.current) return;
       setData(response);
       setError(null);
@@ -219,25 +221,32 @@ export default function OddsScreen({ onSelectMatchup }: Props) {
     } finally {
       if (isMountedRef.current) setLoading(false);
     }
-  }, []);
+  }, [viewMode]);
+
+  const pollInterval = Math.max(1000, Math.round(15_000 / (data?.demo_speed ?? 1)));
 
   useEffect(() => {
     isMountedRef.current = true;
     fetchOdds();
-    const id = setInterval(() => fetchOdds(false), 15_000);
+    const id = setInterval(() => fetchOdds(false), pollInterval);
     return () => {
       isMountedRef.current = false;
       clearInterval(id);
     };
-  }, [fetchOdds]);
+  }, [fetchOdds, viewMode, pollInterval]);
 
   const handleDemoAction = useCallback(() => {
     fetchOdds(false);
   }, [fetchOdds]);
 
+  const heading =
+    data?.demo_mode && viewMode === "day"
+      ? `Daily Matchup of ${data.date}`
+      : weekLabel;
+
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>{weekLabel}</Text>
+      <Text style={styles.heading}>{heading}</Text>
 
       {data?.demo_mode && (
         <DemoToolbar
@@ -245,6 +254,22 @@ export default function OddsScreen({ onSelectMatchup }: Props) {
           serverSpeed={data.demo_speed ?? 1}
           onRefresh={handleDemoAction}
         />
+      )}
+
+      {data?.demo_mode && (
+        <View style={vt.row}>
+          {(["week", "day"] as const).map((mode) => (
+            <TouchableOpacity
+              key={mode}
+              style={[vt.btn, viewMode === mode && vt.btnActive]}
+              onPress={() => setViewMode(mode)}
+            >
+              <Text style={[vt.text, viewMode === mode && vt.textActive]}>
+                {mode === "week" ? "Week" : "Day"}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       )}
 
       {loading && <Text style={styles.status}>Loading…</Text>}
@@ -404,5 +429,30 @@ const tb = StyleSheet.create({
   },
   disabled: {
     opacity: 0.4,
+  },
+});
+
+const vt = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    gap: 5,
+    marginBottom: 10,
+  },
+  btn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: "#1e3a5f",
+  },
+  btnActive: {
+    backgroundColor: "#1d4ed8",
+  },
+  text: {
+    color: "#64748b",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  textActive: {
+    color: "#bfdbfe",
   },
 });
