@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Matchup } from "../api/odds";
 import { NeedleGauge } from "../components/Speedometer";
+import { StackedProjectionBar } from "./StackedProjectionBar";
 
 type Props = {
   matchup: Matchup;
@@ -114,15 +115,32 @@ export default function MatchupCard({
   const formatScoreDelta = (value: number) =>
     value >= 0 ? `+${value.toFixed(1)}` : value.toFixed(1);
 
-  const awayApiScore = currentScores?.[matchup.away_team] ?? matchup.away_current_score;
-  const homeApiScore = currentScores?.[matchup.home_team] ?? matchup.home_current_score;
+  const awayApiScore = matchup.away_current_score;
+  const homeApiScore = matchup.home_current_score;
   const awayApiProj = projScores?.[matchup.away_team] ?? matchup.away_avg;
   const homeApiProj = projScores?.[matchup.home_team] ?? matchup.home_avg;
   const awayApiWinProb = winProbs?.[matchup.away_team] ?? matchup.away_win_prob;
   const homeApiWinProb = winProbs?.[matchup.home_team] ?? matchup.home_win_prob;
+  const awayCurrentMap = currentScores?.[matchup.away_team];
+  const homeCurrentMap = currentScores?.[matchup.home_team];
   const dailyScoreDisplay = Array.isArray(matchup.daily_scores)
     ? matchup.daily_scores.map((n) => n.toFixed(1)).join(", ")
     : null;
+  const awayTodayTotalProj =
+    matchup.away_today_total_proj ??
+    (matchup.away_today_score ?? 0) + (matchup.away_today_remaining_proj ?? 0);
+  const homeTodayTotalProj =
+    matchup.home_today_total_proj ??
+    (matchup.home_today_score ?? 0) + (matchup.home_today_remaining_proj ?? 0);
+  const maxBarScale = Math.max(
+    awayApiProj ?? 0,
+    homeApiProj ?? 0,
+    awayTodayTotalProj,
+    homeTodayTotalProj,
+    awayApiScore ?? 0,
+    homeApiScore ?? 0,
+    1,
+  );
 
   useEffect(() => {
     if (!showLiveIndicator) {
@@ -157,8 +175,9 @@ export default function MatchupCard({
 
   // Fill most of the padded area; cap to avoid overflow on larger screens.
   const contentWidth = cardWidth - 24; // padding: 12 left + 12 right
-  const gaugeSize =
-    contentWidth > 0 ? Math.min(400, contentWidth) : undefined;
+  const gaugeSize = contentWidth > 0
+    ? Math.max(160, Math.min(260, contentWidth - 2 * 150)) // leave space for side graphs
+    : undefined;
 
   return (
     <View style={styles.card} onLayout={handleLayout}>
@@ -171,7 +190,7 @@ export default function MatchupCard({
             <Text style={styles.teamName}>{matchup.away_team}</Text>
           {currentScores?.[matchup.away_team] != null && (
             <Text style={styles.scoreText}>
-              Current Total Points: {currentScores[matchup.away_team]}
+              Current Total Points: {awayApiScore}
             </Text>
           )}
         </View>
@@ -180,19 +199,47 @@ export default function MatchupCard({
         <Text style={styles.teamName}>{matchup.home_team}</Text>
         {currentScores?.[matchup.home_team] != null && (
           <Text style={[styles.scoreText, styles.scoreRight]}>
-            Current Total Points: {currentScores[matchup.home_team]}
+            Current Total Points: {homeApiScore}
           </Text>
         )}
       </View>
       </View>
-      <NeedleGauge
-        size={gaugeSize}
-        value={matchup.home_win_prob}
-        leftLabel={matchup.away_team}
-        rightLabel={matchup.home_team}
-        leftImageUrl={matchup.away_team_url}
-        rightImageUrl={matchup.home_team_url}
-      />
+      <View style={styles.gaugeRow}>
+        <View style={[styles.graphBlock, styles.graphBlockTight]}>
+          <Text style={styles.graphTitle}>{matchup.away_team}</Text>
+          <StackedProjectionBar
+            width={140}
+            height={360}
+            currentTotal={awayApiScore ?? 0}
+            projectedTodayTotal={awayTodayTotalProj - 200}
+            projectedWeekTotal={awayApiProj}
+            maxScale={maxBarScale}
+          />
+        </View>
+
+        <View style={[styles.gaugeContainer, { width: gaugeSize ?? 220 }]}>
+          <NeedleGauge
+            size={gaugeSize}
+            value={matchup.home_win_prob}
+            leftLabel={matchup.away_team}
+            rightLabel={matchup.home_team}
+            leftImageUrl={matchup.away_team_url}
+            rightImageUrl={matchup.home_team_url}
+          />
+        </View>
+
+        <View style={[styles.graphBlock, styles.graphBlockTight]}>
+          <Text style={styles.graphTitle}>{matchup.home_team}</Text>
+          <StackedProjectionBar
+            width={140}
+            height={360}
+            currentTotal={homeApiScore ?? 0}
+            projectedTodayTotal={homeTodayTotalProj}
+            projectedWeekTotal={homeApiProj}
+            maxScale={maxBarScale}
+          />
+        </View>
+      </View>
       <View style={styles.avgRow}>
         <View style={styles.avgBlockLeft}>
           <Text style={styles.label}>Projected Score</Text>
@@ -275,7 +322,7 @@ export default function MatchupCard({
         Simulated {matchup.trials.toLocaleString()} trials
       </Text>
 
-      <TouchableOpacity
+      <TouchableOpacity 
         style={styles.expandButton}
         onPress={() => setExpanded((prev) => !prev)}
         activeOpacity={0.8}
@@ -310,7 +357,7 @@ export default function MatchupCard({
           </View>
           <View style={styles.expandRow}>
             <Text style={styles.expandLabel}>Trials</Text>
-            <Text style={styles.expandValue}>{matchup.trials.toLocaleString()}</Text>
+            <Text style={styles.expandValue}>{matchup.trials.toLocaleString()}</Text> 
           </View>
           <View style={styles.expandRow}>
             <Text style={styles.expandLabel}>Home current score</Text>
@@ -322,6 +369,18 @@ export default function MatchupCard({
             <Text style={styles.expandLabel}>Away current score</Text>
             <Text style={styles.expandValue}>
               {awayApiScore != null ? awayApiScore : "—"}
+            </Text>
+          </View>
+          <View style={styles.expandRow}>
+            <Text style={styles.expandLabel}>Home current (map)</Text>
+            <Text style={styles.expandValue}>
+              {homeCurrentMap != null ? homeCurrentMap : "—"}
+            </Text>
+          </View>
+          <View style={styles.expandRow}>
+            <Text style={styles.expandLabel}>Away current (map)</Text>
+            <Text style={styles.expandValue}>
+              {awayCurrentMap != null ? awayCurrentMap : "—"}
             </Text>
           </View>
           {dailyScoreDisplay ? (
@@ -337,6 +396,12 @@ export default function MatchupCard({
           <View style={styles.expandRow}>
             <Text style={styles.expandLabel}>Away logo URL</Text>
             <Text style={styles.expandValueSmall}>{matchup.away_team_url}</Text>
+          </View>
+          <View style={styles.expandRow}>
+            <Text style={styles.expandLabel}>Raw API data</Text>
+            <Text style={styles.expandValueSmall}>
+              {JSON.stringify(matchup)}
+            </Text>
           </View>
         </View>
       )}
@@ -439,6 +504,32 @@ const styles = StyleSheet.create({
   },
   deltaNegative: {
     color: "#ef4444",
+  },
+  gaugeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-evenly",
+    paddingVertical: 12,
+  },
+  gaugeContainer: {
+    alignItems: "center",
+  },
+  graphBlock: {
+    alignItems: "center",
+    borderRadius: 1,
+    borderWidth: 1,
+    borderColor: "#1f2937",
+    paddingVertical: 8,
+    backgroundColor: "#0f172a",
+    width: 150,
+  },
+  graphBlockTight: {
+    flexGrow: 0,
+  },
+  graphTitle: {
+    color: "#bfdbfe",
+    fontWeight: "800",
+    marginBottom: 8,
   },
   expandButton: {
     marginTop: 8,

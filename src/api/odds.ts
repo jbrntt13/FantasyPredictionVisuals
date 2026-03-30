@@ -12,6 +12,12 @@ export interface Matchup {
   home_current_score?: number;
   away_current_score?: number;
   daily_scores?: number[];
+  home_today_score?: number;
+  away_today_score?: number;
+  home_today_remaining_proj?: number;
+  away_today_remaining_proj?: number;
+  home_today_total_proj?: number;
+  away_today_total_proj?: number;
 }
 
 export interface OddsResponse {
@@ -24,11 +30,14 @@ export interface OddsResponse {
   win_probs: Record<string, number>;
   current_scores: Record<string, number>;
   is_live: boolean;
+  // Demo mode fields (only present when server runs with DEMO_DATE set)
+  demo_mode?: boolean;
+  demo_speed?: number;
+  game_fraction?: number;
 }
-//https://fantasyprediction.onrender.com
-//http://192.168.179.204:8000
-export const API_BASE_URL = "http://192.168.179.204:8000";
-
+// Switch between prod and local:
+export const API_BASE_URL = "https://fantasyprediction.onrender.com";
+//export const API_BASE_URL = "http://192.168.179.204:8000";
 export async function getTodayOdds(): Promise<OddsResponse> {
   const response = await fetch(`${API_BASE_URL}/odds/weekly`);
 
@@ -39,6 +48,22 @@ export async function getTodayOdds(): Promise<OddsResponse> {
 
   const data = (await response.json()) as OddsResponse;
   return data;
+}
+
+export async function demoReset(): Promise<void> {
+  await fetch(`${API_BASE_URL}/demo/reset`, { method: "POST" });
+}
+
+export async function demoSkip(hours: number): Promise<void> {
+  await fetch(`${API_BASE_URL}/demo/skip?hours=${hours}`, { method: "POST" });
+}
+
+export async function demoSetFraction(fraction: number): Promise<void> {
+  await fetch(`${API_BASE_URL}/demo/set-fraction?fraction=${fraction}`, { method: "POST" });
+}
+
+export async function demoSetSpeed(speed: number): Promise<void> {
+  await fetch(`${API_BASE_URL}/demo/set-speed?speed=${speed}`, { method: "POST" });
 }
 
 export async function getCustomOdds(
